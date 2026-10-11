@@ -1,11 +1,16 @@
-// Renders docs/media/moods.png: every state of Pip.
-// swiftc -parse-as-library scripts/make-moods.swift Sources/Pip.swift -o /tmp/pip-moods && /tmp/pip-moods
+// Renders docs/media/moods.png: every state of Pip (with `fr`: moods.fr.png, for README.fr.md).
+// swiftc -parse-as-library scripts/make-moods.swift Sources/Pip.swift -o /tmp/pip-moods && /tmp/pip-moods [fr]
 import AppKit
 import SwiftUI
 
+let french = CommandLine.arguments.contains("fr")
+
 struct Sheet: View {
-  let moods: [(PipMood, String)] = [(.idle, "ready"), (.preparing, "getting ready"), (.listening, "listening"), (.quiet, "nobody talking"),
-                                    (.paused, "paused"), (.whisper, "has a note"), (.done, "saved"), (.error, "problem")]
+  let moods: [(PipMood, String)] = french
+    ? [(.idle, "prêt"), (.preparing, "se prépare"), (.listening, "écoute"), (.quiet, "personne ne parle"),
+       (.paused, "en pause"), (.whisper, "a une note"), (.done, "enregistré"), (.error, "problème")]
+    : [(.idle, "ready"), (.preparing, "getting ready"), (.listening, "listening"), (.quiet, "nobody talking"),
+       (.paused, "paused"), (.whisper, "has a note"), (.done, "saved"), (.error, "problem")]
   var body: some View {
     LazyVGrid(columns: Array(repeating: GridItem(.fixed(190)), count: 4), spacing: 26) {
       ForEach(moods, id: \.1) { mood, label in
@@ -28,7 +33,7 @@ struct MakeMoods {
     let r = ImageRenderer(content: Sheet())
     r.scale = 2
     guard let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { fatalError() }
-    try png.write(to: URL(fileURLWithPath: "docs/media/moods.png"))
+    try png.write(to: URL(fileURLWithPath: french ? "docs/media/moods.fr.png" : "docs/media/moods.png"))
     print("ok")
   }
 }

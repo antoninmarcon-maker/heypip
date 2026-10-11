@@ -1,7 +1,10 @@
 // Renders docs/media/hero.png (README banner) and docs/media/social-preview.png (GitHub social preview, 1280×640).
-// swiftc -parse-as-library scripts/make-hero.swift Sources/Pip.swift -o /tmp/pip-hero && /tmp/pip-hero
+// With `fr`: hero.fr.png and social-preview.fr.png, for README.fr.md and the French site.
+// swiftc -parse-as-library scripts/make-hero.swift Sources/Pip.swift -o /tmp/pip-hero && /tmp/pip-hero [fr]
 import AppKit
 import SwiftUI
+
+let french = CommandLine.arguments.contains("fr")
 
 struct Hero: View {
   var width: CGFloat = 1400
@@ -21,7 +24,7 @@ struct Hero: View {
             Pip(mood: .whisper, size: 74)
             VStack(alignment: .leading, spacing: 6) {
               Text("Claude").font(.system(size: 19, weight: .semibold)).foregroundStyle(blue)
-              Text("Ask when they plan to launch.").font(.system(size: 26, weight: .semibold)).foregroundStyle(.white)
+              Text(french ? "Demande quand ils veulent lancer." : "Ask when they plan to launch.").font(.system(size: 26, weight: .semibold)).foregroundStyle(.white)
             }
             Spacer()
           }
@@ -30,9 +33,9 @@ struct Hero: View {
         .shadow(color: blue.opacity(0.25), radius: 40, y: 10)
       VStack(spacing: 14) {
         Text("Pip").font(.system(size: 96, weight: .heavy, design: .rounded)).foregroundStyle(.white)
-        Text("Your AI whispers in your ear during calls.").font(.system(size: 30, weight: .medium)).foregroundStyle(.white.opacity(0.85))
+        Text(french ? "Ton IA te souffle quoi dire pendant tes appels." : "Your AI whispers in your ear during calls.").font(.system(size: 30, weight: .medium)).foregroundStyle(.white.opacity(0.85))
         HStack(spacing: 10) {
-          ForEach(["Lives in your notch", "Transcribes on your Mac", "Works with Claude Code", "Open source"], id: \.self) { t in
+          ForEach(french ? ["Vit dans ton encoche", "Transcrit sur ton Mac", "Marche avec Claude Code", "Open source"] : ["Lives in your notch", "Transcribes on your Mac", "Works with Claude Code", "Open source"], id: \.self) { t in
             Text(t).font(.system(size: 17, weight: .medium)).foregroundStyle(.white.opacity(0.8))
               .padding(.horizontal, 14).padding(.vertical, 8)
               .background(Capsule().fill(Color.white.opacity(0.08)))
@@ -49,7 +52,7 @@ struct Hero: View {
 @main
 struct MakeHero {
   @MainActor static func main() throws {
-    for (view, file, scale) in [(Hero(), "docs/media/hero.png", 2.0), (Hero(width: 1280, height: 640, titleTop: 270), "docs/media/social-preview.png", 1.0)] {
+    for (view, file, scale) in [(Hero(), french ? "docs/media/hero.fr.png" : "docs/media/hero.png", 2.0), (Hero(width: 1280, height: 640, titleTop: 270), french ? "docs/media/social-preview.fr.png" : "docs/media/social-preview.png", 1.0)] {
       let r = ImageRenderer(content: view)
       r.scale = scale
       guard let cg = r.cgImage, let png = NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:]) else { fatalError() }

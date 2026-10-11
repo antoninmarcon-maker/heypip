@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/media/hero.png" alt="Pip, un petit compagnon dans l'encoche de ton Mac qui te souffle quoi dire pendant tes appels">
+  <img src="docs/media/hero.fr.png" alt="Pip, un petit compagnon dans l'encoche de ton Mac qui te souffle quoi dire pendant tes appels">
 </p>
 
 <p align="center">
@@ -27,8 +27,8 @@ conversation et t'aide à la mener : la prochaine question à poser, l'option à
 le point que personne n'a tranché. Pip sort de l'encoche pour te le souffler.
 
 <p align="center">
-  <img src="docs/media/demo.gif" width="640" alt="Pip pendant un appel : la transcription s'écrit en direct, puis Pip sort de l'encoche pour souffler les notes de l'agent">
-  <br><sub>Démo scénarisée (<code>Pip --demo en</code>) : pas de vrai appel, pas de vraies personnes.</sub>
+  <img src="docs/media/demo.fr.gif" width="640" alt="Pip pendant un appel : la transcription s'écrit en direct, puis Pip sort de l'encoche pour souffler les notes de l'agent">
+  <br><sub>Démo scénarisée (<code>Pip --demo fr</code>) : pas de vrai appel, pas de vraies personnes.</sub>
 </p>
 
 ## Ton agent, en réunion avec toi
@@ -74,7 +74,7 @@ L'appel en entier, les délais et le résumé écrit par Claude à la fin :
 - **Pip montre où il en est.**
 
 <p align="center">
-  <img src="docs/media/moods.png" width="640" alt="Les états de Pip : prêt, se prépare, écoute, personne ne parle, en pause, a une note, enregistré, problème">
+  <img src="docs/media/moods.fr.png" width="640" alt="Les états de Pip : prêt, se prépare, écoute, personne ne parle, en pause, a une note, enregistré, problème">
 </p>
 
 ## Installer
