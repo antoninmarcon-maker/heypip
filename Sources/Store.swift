@@ -46,12 +46,19 @@ enum Store {
     set { defaults.set(newValue, forKey: "agentEnabled") }
   }
 
-  /// Transcription language (BCP 47). Defaults to the Mac's language.
   /// Show the printed Pip next to the notch when no meeting runs.
   static var restingPip: Bool {
     get { defaults.object(forKey: "restingPip") as? Bool ?? true }
     set { defaults.set(newValue, forKey: "restingPip") }
   }
+
+  /// Pip in the menu bar instead of around the notch.
+  static var inMenuBar: Bool {
+    get { defaults.bool(forKey: "inMenuBar") }
+    set { defaults.set(newValue, forKey: "inMenuBar") }
+  }
+
+  /// Transcription language (BCP 47). Defaults to the Mac's language.
 
   static var languageID: String {
     get { defaults.string(forKey: "language") ?? (Locale.preferredLanguages.first ?? "en-US") }

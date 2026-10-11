@@ -50,6 +50,7 @@ enum L10n {
     "agentOff": "Agent off · transcription only",
     "agentToggle": "Agent during calls",
     "restingPip": "Pip next to the notch",
+    "inMenuBar": "Pip in the menu bar",
     "auto": "Mac language",
     "restart": "Applies after restart",
   ]
@@ -94,6 +95,7 @@ enum L10n {
     "agentOff": "Agent coupé · transcription seule",
     "agentToggle": "Agent pendant les appels",
     "restingPip": "Pip à côté de l'encoche",
+    "inMenuBar": "Pip dans la barre de menus",
     "auto": "Langue du Mac",
     "restart": "Prend effet au redémarrage",
   ]

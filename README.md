@@ -95,6 +95,7 @@ on macOS 15 the previous speech recognizer. The speech model for your language d
 | Turn the agent on or off | **✦ Claude** at the top of Pip |
 | Language, vocabulary, folder, quit | the gear, or right-click Pip |
 | Hide the little Pip next to the notch | right-click Pip → **Pip next to the notch** |
+| Put Pip in the menu bar | gear → **Pip in the menu bar**: Pip leaves the notch, click its icon to open it |
 
 **Vocabulary:** add the names of people, companies and products you talk about so they are transcribed right
 (`~/Library/Application Support/Pip/vocabulary.txt`).
@@ -161,7 +162,8 @@ Found a leak? See [SECURITY.md](SECURITY.md).
 **Does it work for meetings in person?** Yes, with your Mac's microphone, but then everyone is « You »: Pip tells
 the sides apart only on a call.
 
-**My Mac has no notch.** Pip sits at the top center of your screen instead.
+**My Mac has no notch.** Pip sits at the top center of your screen instead, or in the menu bar if you prefer
+(gear → **Pip in the menu bar**).
 
 **Which languages?** Every language your Mac's speech recognition supports. The interface is in English and French.
 

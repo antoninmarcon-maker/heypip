@@ -103,6 +103,7 @@ télécharge une seule fois.
 | Activer ou couper l'agent | **✦ Claude** en haut de Pip |
 | Langue, vocabulaire, dossier, quitter | la roue dentée, ou clic droit sur Pip |
 | Masquer le petit Pip à côté de l'encoche | clic droit sur Pip → **Pip à côté de l'encoche** |
+| Mettre Pip dans la barre de menus | roue dentée → **Pip dans la barre de menus** : Pip quitte l'encoche, un clic sur son icône l'ouvre |
 
 **Vocabulaire :** ajoute les noms des personnes, entreprises et produits dont tu parles pour qu'ils soient bien
 transcrits (`~/Library/Application Support/Pip/vocabulary.txt`).
@@ -170,7 +171,8 @@ Tu as trouvé une fuite ? Voir [SECURITY.md](SECURITY.md).
 **Est-ce qu'il marche pour une réunion en présentiel ?** Oui, avec le micro de ton Mac, mais tout le monde est alors
 « Toi » : Pip ne distingue les deux côtés que pendant un appel.
 
-**Mon Mac n'a pas d'encoche.** Pip se place alors en haut au centre de ton écran.
+**Mon Mac n'a pas d'encoche.** Pip se place alors en haut au centre de ton écran, ou dans la barre de menus si tu
+préfères (roue dentée → **Pip dans la barre de menus**).
 
 **Quelles langues ?** Toutes celles que la reconnaissance vocale de ton Mac comprend. L'interface est en anglais et en
 français.

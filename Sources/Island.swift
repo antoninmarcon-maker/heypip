@@ -4,6 +4,7 @@ import SwiftUI
 
 // The island lives around the MacBook notch (or as a pill at the top of a screen without one).
 // Collapsed: a black band around the notch. Hover: it opens. A new agent note: it peeks for 8 s.
+// In the menu bar (a setting): Pip is a menu bar icon; a click opens the same island under it, and notes peek there.
 //
 // The window never changes size: it is as big as the open island and lets clicks through everywhere except on the
 // island. Hover is decided by comparing the pointer with the island's current rectangle, on every mouse move anywhere
@@ -36,6 +37,8 @@ struct NotchGeometry {
   @Published var languages: [Locale] = []
   /// A printed Pip on the left of the notch while no meeting runs, so people know where Pip lives.
   @Published var restingPip = Store.restingPip { didSet { Store.restingPip = restingPip } }
+  /// Pip lives in the menu bar instead of around the notch.
+  @Published var inMenuBar = Store.inMenuBar { didSet { Store.inMenuBar = inMenuBar } }
   let geometry = NotchGeometry.detect()
   let agentName = UserDefaults.standard.string(forKey: "agentName") ?? "Claude"
 
@@ -44,21 +47,29 @@ struct NotchGeometry {
   /// Width of the ear that holds the printed Pip at rest.
   static let restingEar: CGFloat = 38
 
-  var panelSize: CGSize { CGSize(width: Self.openWidth + 40, height: geometry.height + Self.openBody + 30) }
+  var panelSize: CGSize { CGSize(width: Self.openWidth + 40, height: band + Self.openBody + 30) }
+
+  /// Height of the island's top bar: the notch's height, or a little more under the menu bar.
+  var band: CGFloat { inMenuBar ? 40 : geometry.height }
+  /// Room above a peeking note: it comes out from under the notch, or sits just under the menu bar.
+  var peekTop: CGFloat { inMenuBar ? 12 : geometry.height - 6 }
+  /// The gap the notch leaves in the top bar.
+  var notchGap: CGFloat { inMenuBar ? 0 : geometry.notchWidth }
 
   func size(for mode: IslandMode, running: Bool) -> CGSize {
     let g = geometry
+    if inMenuBar, mode == .collapsed { return .zero }  // nothing on screen: the menu bar icon stands for Pip
     switch mode {
     // at rest: the notch, plus the printed Pip on its left if wanted; while listening: ears on each side for Pip and the timer
     case .collapsed: return CGSize(width: g.notchWidth + (running ? 2 * 64 : (restingPip ? Self.restingEar : 0)), height: g.height)
-    case .peek: return CGSize(width: max(g.notchWidth + 200, 460), height: g.height + 62)
-    case .expanded: return CGSize(width: Self.openWidth, height: g.height + Self.openBody)
+    case .peek: return CGSize(width: max(g.notchWidth + 200, 460), height: peekTop + 68)
+    case .expanded: return CGSize(width: Self.openWidth, height: band + Self.openBody)
     }
   }
 
   /// The island is centred on the notch, except at rest with the printed Pip: it only grows to the left.
   func shift(for mode: IslandMode, running: Bool) -> CGFloat {
-    mode == .collapsed && !running && restingPip ? -Self.restingEar / 2 : 0
+    mode == .collapsed && !running && restingPip && !inMenuBar ? -Self.restingEar / 2 : 0
   }
 }
 
@@ -92,6 +103,10 @@ final class NotchPanel: NSPanel {
   private var openedByHover = false
   private var closing: Task<Void, Never>?
   private var outsideClick: Any?
+  private var statusItem: NSStatusItem?
+  private var statusTarget: StatusTarget?
+  private var statusMood: PipMood?
+  private var statusClock: Timer?
 
   /// Room around the island that still counts as being on it, in points.
   private static let margin: CGFloat = 4
@@ -108,7 +123,10 @@ final class NotchPanel: NSPanel {
 
     meeting.$peek.receive(on: RunLoop.main).sink { [weak self] peek in
       guard let self else { return }
-      if peek != nil, self.state.mode == .collapsed { self.set(.peek) }
+      if peek != nil, self.state.mode == .collapsed {
+        if self.state.inMenuBar { self.placePanel() }
+        self.set(.peek)
+      }
       if peek == nil, self.state.mode == .peek { self.set(.collapsed) }
     }.store(in: &bag)
 
@@ -120,13 +138,103 @@ final class NotchPanel: NSPanel {
     NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
       Task { @MainActor in self?.placePanel() }
     }
+    // Notch or menu bar: switching from the settings moves Pip right away.
+    state.$inMenuBar.dropFirst().receive(on: RunLoop.main).sink { [weak self] inMenuBar in
+      self?.applyPlacement(show: inMenuBar)
+    }.store(in: &bag)
+    // The menu bar icon shows Pip's mood.
+    meeting.objectWillChange.debounce(for: .milliseconds(80), scheduler: RunLoop.main).sink { [weak self] in
+      self?.refreshStatusIcon()
+      self?.refreshStatusClock()
+    }.store(in: &bag)
+
     watchPointer()
+    applyPlacement(show: false)
   }
 
   private func placePanel() {
-    let g = state.geometry
     let s = state.panelSize
+    if state.inMenuBar, let window = statusItem?.button?.window, let screen = window.screen {
+      // hang the island under the menu bar icon, kept on screen
+      let item = window.frame
+      let x = min(max(item.midX - s.width / 2, screen.frame.minX), screen.frame.maxX - s.width)
+      panel.setFrame(NSRect(x: x, y: item.minY - 4 - s.height, width: s.width, height: s.height), display: true)
+      return
+    }
+    let g = state.geometry
     panel.setFrame(NSRect(x: g.centerX - s.width / 2, y: g.screen.frame.maxY - s.height, width: s.width, height: s.height), display: true)
+  }
+
+  /// Puts Pip around the notch or in the menu bar. `show` opens the island under the new icon, so people see where
+  /// Pip went.
+  private func applyPlacement(show: Bool) {
+    if state.pinned { unpin() }
+    set(.collapsed)
+    if state.inMenuBar {
+      if statusItem == nil {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let target = StatusTarget { [weak self] in self?.statusItemClicked() }
+        item.button?.target = target
+        item.button?.action = #selector(StatusTarget.fire)
+        item.button?.toolTip = "Pip"
+        statusItem = item
+        statusTarget = target
+        statusMood = nil
+        refreshStatusIcon()
+      }
+    } else if let item = statusItem {
+      NSStatusBar.system.removeStatusItem(item)
+      statusItem = nil
+      statusTarget = nil
+    }
+    refreshStatusClock()
+    // the icon has a place on screen only after the menu bar lays it out
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.placePanel()
+      if show { self.pin() }
+    }
+  }
+
+  private func statusItemClicked() {
+    if state.mode == .expanded { unpin(); set(meeting.peek != nil ? .peek : .collapsed) } else { pin() }
+  }
+
+  private func refreshStatusIcon() {
+    guard let button = statusItem?.button else { return }
+    let mood = meeting.mood
+    guard mood != statusMood else { return }
+    statusMood = mood
+    // on a white disc: a blue Pip alone can vanish on some wallpapers
+    let icon = ZStack {
+      Circle().fill(Color.white)
+      Circle().stroke(Color.black.opacity(0.12), lineWidth: 0.5)
+      Pip(mood: mood, size: 14).offset(y: 0.5)
+    }
+    .frame(width: 20, height: 20)
+    .padding(1)
+    let r = ImageRenderer(content: icon)
+    r.scale = NSScreen.main?.backingScaleFactor ?? 2
+    button.image = r.nsImage
+  }
+
+  /// While recording, the recording time next to the icon (the notch shows it in its right ear).
+  private func refreshStatusClock() {
+    guard let button = statusItem?.button, meeting.running else {
+      statusItem?.button?.title = ""
+      statusClock?.invalidate()
+      statusClock = nil
+      return
+    }
+    let t = Int(meeting.elapsed(at: Date()))
+    button.imagePosition = .imageLeading
+    button.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
+    button.title = t >= 3600 ? String(format: " %d:%02d:%02d", t / 3600, t / 60 % 60, t % 60) : String(format: " %d:%02d", t / 60, t % 60)
+    if statusClock == nil {
+      statusClock = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        MainActor.assumeIsolated { self?.refreshStatusClock() }
+      }
+    }
   }
 
   func set(_ mode: IslandMode) {
@@ -161,7 +269,8 @@ final class NotchPanel: NSPanel {
   private func followPointer() {
     let r = islandRect()
     let zone = NSRect(x: r.minX - Self.margin, y: r.minY - Self.margin, width: r.width + 2 * Self.margin, height: r.height + 2 * Self.margin)
-    let onIsland = zone.contains(NSEvent.mouseLocation)
+    // in the menu bar, nothing is on screen at rest: only the icon opens Pip
+    let onIsland = !(state.inMenuBar && state.mode == .collapsed) && zone.contains(NSEvent.mouseLocation)
     if panel.ignoresMouseEvents == onIsland { panel.ignoresMouseEvents = !onIsland }
     guard onIsland != hovering else { return }
     hovering = onIsland
@@ -191,6 +300,7 @@ final class NotchPanel: NSPanel {
   }
 
   func pin() {
+    if state.inMenuBar { placePanel() }  // the icon may have moved
     state.pinned = true
     openedByHover = false
     set(.expanded)
@@ -206,6 +316,13 @@ final class NotchPanel: NSPanel {
     if let m = outsideClick { NSEvent.removeMonitor(m); outsideClick = nil }
     if !hovering { set(meeting.peek != nil ? .peek : .collapsed) } else { openedByHover = true }
   }
+}
+
+/// Target for the menu bar icon's clicks (AppKit needs an Objective-C object).
+private final class StatusTarget: NSObject {
+  let action: () -> Void
+  init(_ action: @escaping () -> Void) { self.action = action }
+  @objc func fire() { action() }
 }
 
 // MARK: - Shape: the island hangs from the top of the screen like the notch
@@ -253,9 +370,17 @@ struct IslandView: View {
     let size = state.size(for: state.mode, running: meeting.running)
     let shift = state.shift(for: state.mode, running: meeting.running)
     ZStack(alignment: .top) {
-      NotchSilhouette(corner: state.mode == .collapsed ? 10 : 24,
-                      flare: state.mode == .collapsed ? (meeting.running || state.restingPip ? 7 : 0) : 12)
-        .fill(Color.black)
+      Group {
+        if state.inMenuBar {
+          // under the menu bar: a card, like a menu
+          RoundedRectangle(cornerRadius: state.mode == .peek ? 20 : 24, style: .continuous).fill(Color.black)
+            .overlay(RoundedRectangle(cornerRadius: state.mode == .peek ? 20 : 24, style: .continuous).stroke(hairline, lineWidth: 1))
+        } else {
+          NotchSilhouette(corner: state.mode == .collapsed ? 10 : 24,
+                          flare: state.mode == .collapsed ? (meeting.running || state.restingPip ? 7 : 0) : 12)
+            .fill(Color.black)
+        }
+      }
         .frame(width: size.width, height: size.height)
         .offset(x: shift)
         .contentShape(Rectangle())
@@ -325,7 +450,7 @@ struct IslandView: View {
 
   private var peekView: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Color.clear.frame(height: state.geometry.height - 6)
+      Color.clear.frame(height: state.peekTop)
       HStack(spacing: 10) {
         Pip(mood: .whisper, size: 40)
         VStack(alignment: .leading, spacing: 2) {
@@ -360,7 +485,7 @@ struct IslandView: View {
       tabButton(.live, "waveform")
       tabButton(.notes, "text.bubble")
       Spacer()
-      Color.clear.frame(width: state.geometry.notchWidth)
+      Color.clear.frame(width: state.notchGap)
       Spacer()
       Button { meeting.toggleAgent() } label: {
         HStack(spacing: 5) {
@@ -382,7 +507,7 @@ struct IslandView: View {
       .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
     }
     .padding(.horizontal, 14)
-    .frame(height: state.geometry.height)
+    .frame(height: state.band)
   }
 
   private func tabButton(_ tab: IslandTab, _ symbol: String) -> some View {
@@ -568,7 +693,10 @@ struct IslandView: View {
       Button(L10n.t(meeting.paused ? "resume" : "pause")) { meeting.togglePause() }
     }
     Toggle(L10n.t("agentToggle"), isOn: Binding(get: { meeting.agentEnabled }, set: { _ in meeting.toggleAgent() }))
-    Toggle(L10n.t("restingPip"), isOn: $state.restingPip)
+    Toggle(L10n.t("inMenuBar"), isOn: $state.inMenuBar)
+    if !state.inMenuBar {
+      Toggle(L10n.t("restingPip"), isOn: $state.restingPip)
+    }
     Menu(L10n.t("language")) {
       ForEach(state.languages, id: \.identifier) { loc in
         let name = Locale(identifier: L10n.isFrench ? "fr" : "en").localizedString(forIdentifier: loc.identifier) ?? loc.identifier
@@ -599,17 +727,7 @@ struct IslandView: View {
     Button(L10n.t("quit")) { NSApp.terminate(nil) }
   }
 
-  private var pipMood: PipMood {
-    if meeting.peek != nil && meeting.agentEnabled { return .whisper }
-    if meeting.failed { return .error }
-    if meeting.busy { return .preparing }
-    if meeting.running {
-      if meeting.paused { return .paused }
-      return (meeting.hears[.me] == true || meeting.hears[.them] == true) ? .listening : .quiet
-    }
-    if let end = meeting.endedAt, Date().timeIntervalSince(end) < 300 { return .done }
-    return .idle
-  }
+  private var pipMood: PipMood { meeting.mood }
 
   private func clock(_ seconds: TimeInterval) -> String {
     let s = max(0, Int(seconds))
@@ -653,5 +771,20 @@ struct PillButton: ButtonStyle {
       .padding(.vertical, 8)
       .background(Capsule().fill(stop ? Color.red.opacity(0.88) : Color.white))
       .opacity(configuration.isPressed ? 0.7 : 1)
+  }
+}
+
+extension Meeting {
+  /// How Pip looks right now (the island and the menu bar icon).
+  var mood: PipMood {
+    if peek != nil && agentEnabled { return .whisper }
+    if failed { return .error }
+    if busy { return .preparing }
+    if running {
+      if paused { return .paused }
+      return (hears[.me] == true || hears[.them] == true) ? .listening : .quiet
+    }
+    if let end = endedAt, Date().timeIntervalSince(end) < 300 { return .done }
+    return .idle
   }
 }
