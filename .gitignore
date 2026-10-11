@@ -1,0 +1,5 @@
+Pip.app/
+Pip.zip
+Pip.xcodeproj/
+build/
+.DS_Store

@@ -1,0 +1,24 @@
+# Xcode project used for signed releases (release.sh). Day-to-day builds use build.sh.
+name: Pip
+options:
+  bundleIdPrefix: com.sachapraljak
+targets:
+  Pip:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: Sources
+      - path: Resources/AppIcon.icns
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_NAME: Pip
+        PRODUCT_BUNDLE_IDENTIFIER: com.sachapraljak.heypip
+        INFOPLIST_FILE: Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: Pip.entitlements
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+        SWIFT_VERSION: "5.0"
+        ONLY_ACTIVE_ARCH: NO
