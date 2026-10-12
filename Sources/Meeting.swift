@@ -11,15 +11,23 @@ struct FeedItem: Identifiable {
   let text: String
 }
 
-/// Last time each side was heard (written from the audio queue).
+/// Last time each side was heard, and last time it sent any audio at all (written from the audio queue).
 final class Levels: @unchecked Sendable {
   private let lock = NSLock()
   private var last: [Speaker: Date] = [:]
+  private var received: [Speaker: Date] = [:]
   func heard(_ who: Speaker) { lock.lock(); last[who] = Date(); lock.unlock() }
   func recent(_ who: Speaker, within s: TimeInterval = 2.5) -> Bool {
     lock.lock(); defer { lock.unlock() }
     return last[who].map { Date().timeIntervalSince($0) < s } ?? false
   }
+  func got(_ who: Speaker) { lock.lock(); received[who] = Date(); lock.unlock() }
+  /// No audio at all from this side (not even silence) for `s` seconds.
+  func stalled(_ who: Speaker, for s: TimeInterval) -> Bool {
+    lock.lock(); defer { lock.unlock() }
+    return received[who].map { Date().timeIntervalSince($0) > s } ?? true
+  }
+  func reset() { lock.lock(); received = [:]; lock.unlock() }
 }
 
 /// A flag the audio queue can read.
@@ -77,6 +85,9 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
   private var levelsTimer: Timer?
   private var notesDate: Date?
   private var peekTask: Task<Void, Never>?
+  private var captureStartedAt: Date?
+  private var restarts = 0
+  private var restarting = false
   private let timeFormat: DateFormatter = { let f = DateFormatter(); f.dateFormat = "HH:mm:ss"; return f }()
 
   func toggle() {
@@ -116,6 +127,9 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
       pausedAt = nil
       pausedTotal = 0
       pauseFlag.value = false
+      guard await microphoneAllowed() else {
+        throw NSError(domain: "Pip", code: 3, userInfo: [NSLocalizedDescriptionKey: L10n.t("noMic")])
+      }
       let dir = try Store.newMeeting(name: name)
       self.dir = dir
       feed = []
@@ -137,6 +151,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
       let levels = self.levels
       let pauseFlag = self.pauseFlag
       capture.onAudio = { buf, who in
+        levels.got(who)
         if pauseFlag.value { return }
         if hasSound(buf) { levels.heard(who) }
         (who == .me ? me : them).feed(buf)
@@ -147,7 +162,10 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
           self?.failed = true
         }
       }
+      levels.reset()
       try await capture.start()
+      captureStartedAt = Date()
+      restarts = 0
       running = true
       startedAt = Date()
       status = L10n.t("listening")
@@ -158,6 +176,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
           guard let self else { return }
           let now: [Speaker: Bool] = [.me: self.levels.recent(.me), .them: self.levels.recent(.them)]
           if now != self.hears { self.hears = now }
+          self.watchCapture()
         }
       }
     } catch {
@@ -197,6 +216,29 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
     DispatchQueue.main.asyncAfter(deadline: .now() + 300) { [weak self] in
       guard let self, !self.running else { return }
       self.notesTimer?.invalidate()
+    }
+  }
+
+  /// ScreenCaptureKit sends audio all the time, silence included. A side that sends nothing at all has stalled
+  /// (the microphone changed, AirPods switching to call mode…): restart the capture, three times at most per meeting.
+  private func watchCapture() {
+    guard running, !busy, !restarting, restarts < 3, let since = captureStartedAt, Date().timeIntervalSince(since) > 4,
+          levels.stalled(.me, for: 3) || levels.stalled(.them, for: 3) else { return }
+    restarting = true
+    restarts += 1
+    Task {
+      defer { restarting = false }
+      await capture.stop()
+      levels.reset()
+      guard running else { return }
+      do {
+        try await capture.start()
+        captureStartedAt = Date()
+        if !running { await capture.stop() }
+      } catch {
+        status = "\(L10n.t("captureStopped")) : \(error.localizedDescription)"
+        failed = true
+      }
     }
   }
 

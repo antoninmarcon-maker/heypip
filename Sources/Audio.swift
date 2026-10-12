@@ -34,9 +34,11 @@ func makeTranscriber(speaker: Speaker, fileURL: URL) -> Transcribing {
   return LegacyTranscriber(speaker: speaker, fileURL: fileURL)
 }
 
-/// Writes one side of the call to an .m4a file.
+/// Writes one side of the call to an .m4a file. The file keeps the format of the first buffer; later buffers in another
+/// format (the microphone changed, AirPods switching to call mode) are converted instead of being dropped.
 final class Recorder: @unchecked Sendable {
   private var file: AVAudioFile?
+  private var converter: AVAudioConverter?
   private let url: URL
   init(url: URL) { self.url = url }
   func write(_ buf: AVAudioPCMBuffer) {
@@ -45,9 +47,29 @@ final class Recorder: @unchecked Sendable {
                                      AVNumberOfChannelsKey: buf.format.channelCount, AVEncoderBitRateKey: 64000]
       file = try? AVAudioFile(forWriting: url, settings: settings, commonFormat: buf.format.commonFormat, interleaved: buf.format.isInterleaved)
     }
-    try? file?.write(from: buf)
+    guard let file else { return }
+    let target = file.processingFormat
+    if buf.format == target { try? file.write(from: buf); return }
+    if converter == nil || converter?.inputFormat != buf.format { converter = AVAudioConverter(from: buf.format, to: target) }
+    if let out = convert(buf, with: converter, to: target) { try? file.write(from: out) }
   }
-  func close() { file = nil }
+  func close() { file = nil; converter = nil }
+}
+
+/// One buffer through an AVAudioConverter (sample rate and channel changes included).
+func convert(_ buf: AVAudioPCMBuffer, with converter: AVAudioConverter?, to target: AVAudioFormat) -> AVAudioPCMBuffer? {
+  guard let converter else { return nil }
+  let capacity = AVAudioFrameCount(Double(buf.frameLength) * target.sampleRate / buf.format.sampleRate) + 1024
+  guard let out = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return nil }
+  var fed = false
+  var error: NSError?
+  converter.convert(to: out, error: &error) { _, status in
+    if fed { status.pointee = .noDataNow; return nil }
+    fed = true
+    status.pointee = .haveData
+    return buf
+  }
+  return error == nil && out.frameLength > 0 ? out : nil
 }
 
 @available(macOS 26, *)
@@ -108,19 +130,7 @@ final class LiveTranscriber: Transcribing, @unchecked Sendable {
     if converter == nil || converter?.inputFormat != buf.format {
       converter = AVAudioConverter(from: buf.format, to: target)
     }
-    guard let converter else { return }
-    let ratio = target.sampleRate / buf.format.sampleRate
-    let capacity = AVAudioFrameCount(Double(buf.frameLength) * ratio) + 1024
-    guard let out = AVAudioPCMBuffer(pcmFormat: target, frameCapacity: capacity) else { return }
-    var fed = false
-    var error: NSError?
-    converter.convert(to: out, error: &error) { _, status in
-      if fed { status.pointee = .noDataNow; return nil }
-      fed = true
-      status.pointee = .haveData
-      return buf
-    }
-    if error == nil, out.frameLength > 0 { input.yield(AnalyzerInput(buffer: out)) }
+    if let out = convert(buf, with: converter, to: target) { input.yield(AnalyzerInput(buffer: out)) }
   }
 
   private func closeInput() {
@@ -215,6 +225,15 @@ final class LegacyTranscriber: Transcribing, @unchecked Sendable {
 }
 
 // MARK: - Capture: the Mac's audio (them) + the microphone (you)
+
+/// Ask for the microphone before the capture starts, so the system's question never lands in the middle of a capture.
+func microphoneAllowed() async -> Bool {
+  switch AVCaptureDevice.authorizationStatus(for: .audio) {
+  case .authorized: return true
+  case .notDetermined: return await AVCaptureDevice.requestAccess(for: .audio)
+  default: return false
+  }
+}
 
 final class Capture: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
   private var stream: SCStream?

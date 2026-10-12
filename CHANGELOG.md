@@ -13,4 +13,6 @@ First public version.
 - You (microphone) and Them (the call's audio) on separate tracks.
 - Agent switch: the agent only sees `agent-feed.md`, only while it is on.
 - Pause, vocabulary, transcription and interface language (English, French).
+- Asks for the microphone before the first recording, and restarts the capture by itself if one side stops sending
+  audio (microphone changed, AirPods switching to call mode); a recording keeps one format when the microphone changes.
 - The `/pip` command for Claude Code: follows the call, whispers notes, writes the summary.
