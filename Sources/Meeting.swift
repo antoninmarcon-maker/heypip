@@ -27,7 +27,30 @@ final class Levels: @unchecked Sendable {
     lock.lock(); defer { lock.unlock() }
     return received[who].map { Date().timeIntervalSince($0) > s } ?? true
   }
-  func reset() { lock.lock(); received = [:]; lock.unlock() }
+  func reset() { lock.lock(); received = [:]; loudness = [:]; lock.unlock() }
+
+  private var loudness: [Speaker: [(time: Date, rms: Float)]] = [:]
+  /// Loudness of each buffer, kept for 1.5 s, to tell the call's echo from your voice.
+  func loud(_ who: Speaker, _ rms: Float) {
+    let now = Date()
+    lock.lock(); defer { lock.unlock() }
+    loudness[who, default: []].append((now, rms))
+    loudness[who]!.removeAll { now.timeIntervalSince($0.time) > 1.5 }
+  }
+  /// The microphone only hears the call through the speakers (see Echo.swift).
+  func micIsEcho() -> Bool {
+    lock.lock(); let me = loudness[.me] ?? [], them = loudness[.them] ?? []; lock.unlock()
+    let now = Date()
+    func bins(_ s: [(time: Date, rms: Float)]) -> [Float] {
+      var b = [Float](repeating: 0, count: 60)  // 1.2 s in 20 ms bins, oldest first
+      for (time, rms) in s {
+        let i = 59 - Int(now.timeIntervalSince(time) / 0.02)
+        if b.indices.contains(i) { b[i] = max(b[i], rms) }
+      }
+      return b
+    }
+    return envelopesMatch(mic: bins(me), call: bins(them))
+  }
 }
 
 /// A flag the audio queue can read.
@@ -40,14 +63,17 @@ final class Flag: @unchecked Sendable {
   }
 }
 
-/// Is there sound in this buffer (not just silence)?
-func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
-  guard let ch = buf.floatChannelData?[0], buf.frameLength > 0 else { return false }
+/// Loudness of a buffer (root mean square of every 8th sample).
+func rms(_ buf: AVAudioPCMBuffer) -> Float {
+  guard let ch = buf.floatChannelData?[0], buf.frameLength > 0 else { return 0 }
   var sum: Float = 0
   let n = Int(buf.frameLength)
   for i in stride(from: 0, to: n, by: 8) { sum += ch[i] * ch[i] }
-  return (sum / Float(max(1, n / 8))).squareRoot() > 0.01
+  return (sum / Float(max(1, n / 8))).squareRoot()
 }
+
+/// Is there sound in this buffer (not just silence)?
+func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
 
 @MainActor final class Meeting: ObservableObject {
   @Published var running = false
@@ -82,6 +108,9 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
   private var notesTimer: Timer?
   private let levels = Levels()
   private var splitters: [Speaker: SentenceSplitter] = [:]
+  private let echo = EchoText()
+  /// « You » sentences waiting EchoText.wait seconds before they are written (or dropped as an echo).
+  private var pendingMe: [(time: Date, text: String)] = []
   private var levelsTimer: Timer?
   private var notesDate: Date?
   private var peekTask: Task<Void, Never>?
@@ -135,6 +164,8 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
       feed = []
       hears = [:]
       splitters = [.me: SentenceSplitter(), .them: SentenceSplitter()]
+      echo.reset()
+      pendingMe = []
       volatile = [:]
       notes = []
       notesDate = nil
@@ -153,7 +184,9 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
       capture.onAudio = { buf, who in
         levels.got(who)
         if pauseFlag.value { return }
-        if hasSound(buf) { levels.heard(who) }
+        let loudness = rms(buf)
+        levels.loud(who, loudness)
+        if loudness > 0.01 { levels.heard(who) }
         (who == .me ? me : them).feed(buf)
       }
       capture.onError = { [weak self] msg in
@@ -174,7 +207,9 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
       levelsTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
         Task { @MainActor in
           guard let self else { return }
-          let now: [Speaker: Bool] = [.me: self.levels.recent(.me), .them: self.levels.recent(.them)]
+          self.flushMe()
+          let me = self.levels.recent(.me) && !self.levels.micIsEcho()
+          let now: [Speaker: Bool] = [.me: me, .them: self.levels.recent(.them)]
           if now != self.hears { self.hears = now }
           self.watchCapture()
         }
@@ -196,6 +231,8 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
     await capture.stop()
     for t in transcribers.values { await t.stop() }
     transcribers = [:]
+    try? await Task.sleep(for: .milliseconds(300))  // last results still on their way to handle()
+    flushMe(force: true)
     if let dir {
       let f = DateFormatter()
       f.dateFormat = "HH:mm"
@@ -248,16 +285,35 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool {
     splitters[who] = splitter
     if final {
       volatile[who] = nil
-      for sentence in splitter.final(text) { write(who, sentence) }
+      for sentence in splitter.final(text) { route(who, sentence) }
     } else {
       let (new, tail) = splitter.volatile(text)
-      for sentence in new { write(who, sentence) }
-      volatile[who] = tail.isEmpty ? nil : tail
+      for sentence in new { route(who, sentence) }
+      if who == .them { echo.them(tail) }
+      volatile[who] = tail.isEmpty || (who == .me && echo.isEcho(tail)) ? nil : tail
     }
   }
 
-  func write(_ who: Speaker, _ text: String) {
-    let item = FeedItem(time: Date(), kind: .speech(who), text: text)
+  /// « Them » is written at once; « You » waits a moment, so an echo of « Them » can be recognised and dropped.
+  private func route(_ who: Speaker, _ sentence: String) {
+    if who == .them {
+      echo.them(sentence)
+      write(.them, sentence)
+    } else {
+      pendingMe.append((Date(), sentence))
+    }
+  }
+
+  private func flushMe(force: Bool = false) {
+    let now = Date()
+    while let first = pendingMe.first, force || now.timeIntervalSince(first.time) >= EchoText.wait {
+      pendingMe.removeFirst()
+      if !echo.isEcho(first.text, at: first.time) { write(.me, first.text, at: first.time) }
+    }
+  }
+
+  func write(_ who: Speaker, _ text: String, at time: Date = Date()) {
+    let item = FeedItem(time: time, kind: .speech(who), text: text)
     feed.append(item)
     if feed.count > 400 { feed.removeFirst(feed.count - 400) }
     if let dir {
