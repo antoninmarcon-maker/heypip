@@ -111,6 +111,8 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
   private let echo = EchoText()
   /// « You » sentences waiting EchoText.wait seconds before they are written (or dropped as an echo).
   private var pendingMe: [(time: Date, text: String)] = []
+  /// Last time the microphone was only hearing the call.
+  private var micEchoAt: Date?
   private var levelsTimer: Timer?
   private var notesDate: Date?
   private var peekTask: Task<Void, Never>?
@@ -166,6 +168,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       splitters = [.me: SentenceSplitter(), .them: SentenceSplitter()]
       echo.reset()
       pendingMe = []
+      micEchoAt = nil
       volatile = [:]
       notes = []
       notesDate = nil
@@ -208,7 +211,9 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
         Task { @MainActor in
           guard let self else { return }
           self.flushMe()
-          let me = self.levels.recent(.me) && !self.levels.micIsEcho()
+          let micEcho = self.levels.micIsEcho()
+          if micEcho { self.micEchoAt = Date() }
+          let me = self.levels.recent(.me) && !micEcho
           let now: [Speaker: Bool] = [.me: me, .them: self.levels.recent(.them)]
           if now != self.hears { self.hears = now }
           self.watchCapture()
@@ -248,6 +253,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     pauseFlag.value = false
     endedAt = Date()
     volatile = [:]
+    name = ""  // « Start » is a new meeting, never the one that just ended
     status = L10n.t("ended")
     // keep reading notes for a few minutes: the agent may still write the summary
     DispatchQueue.main.asyncAfter(deadline: .now() + 300) { [weak self] in
@@ -290,7 +296,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       let (new, tail) = splitter.volatile(text)
       for sentence in new { route(who, sentence) }
       if who == .them { echo.them(tail) }
-      volatile[who] = tail.isEmpty || (who == .me && echo.isEcho(tail)) ? nil : tail
+      volatile[who] = tail.isEmpty ? nil : who == .me ? echo.filter(tail) : tail
     }
   }
 
@@ -308,8 +314,40 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     let now = Date()
     while let first = pendingMe.first, force || now.timeIntervalSince(first.time) >= EchoText.wait {
       pendingMe.removeFirst()
-      if !echo.isEcho(first.text, at: first.time) { write(.me, first.text, at: first.time) }
+      if let mine = echo.filter(first.text, at: first.time, micEcho: micEchoAt.map { first.time.timeIntervalSince($0) < 5 } ?? false) {
+        write(.me, mine, at: first.time)
+      }
     }
+  }
+
+  /// Shows a past meeting in the island (its transcript and notes). « Start » still begins a new one.
+  func show(_ meetingDir: URL) {
+    guard !running else { return }
+    let day = String(meetingDir.lastPathComponent.prefix(10))  // yyyy-MM-dd
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+    let text = (try? String(contentsOf: meetingDir.appendingPathComponent("transcript.md"), encoding: .utf8)) ?? ""
+    var items: [FeedItem] = []
+    for line in text.split(separator: "\n") {
+      // [12:03:15] Toi: …
+      guard line.hasPrefix("["), let close = line.firstIndex(of: "]"),
+            let colon = line[close...].firstIndex(of: ":") else { continue }
+      let clock = line[line.index(after: line.startIndex)..<close]
+      let labelStart = line.index(close, offsetBy: 2, limitedBy: colon) ?? colon
+      let label = line[labelStart..<colon].trimmingCharacters(in: .whitespaces)
+      let said = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+      let who: Speaker = ["You", "Toi"].contains(label) ? .me : .them
+      items.append(FeedItem(time: f.date(from: "\(day) \(clock)") ?? Date(), kind: .speech(who), text: said))
+    }
+    let noteText = (try? String(contentsOf: meetingDir.appendingPathComponent("notes.md"), encoding: .utf8)) ?? ""
+    notes = noteText.split(separator: "\n").map { String($0).trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }.map { $0.hasPrefix("- ") ? String($0.dropFirst(2)) : $0 }.reversed()
+    feed = Array(items.suffix(400))
+    dir = meetingDir
+    notesDate = nil
+    peek = nil
+    volatile = [:]
+    status = Store.meetingTitle(meetingDir)
   }
 
   func write(_ who: Speaker, _ text: String, at time: Date = Date()) {

@@ -710,6 +710,11 @@ struct IslandView: View {
       }
     }
     Button(L10n.t("vocabulary")) { NSWorkspace.shared.open(Store.vocabularyFile) }
+    Menu(L10n.t("recent")) {
+      ForEach(Store.recentMeetings(), id: \.self) { dir in
+        Button((dir == meeting.dir ? "✓ " : "") + Store.meetingTitle(dir)) { meeting.show(dir) }.disabled(meeting.running)
+      }
+    }
     Button(L10n.t("meetings")) {
       try? FileManager.default.createDirectory(at: Store.root, withIntermediateDirectories: true)
       NSWorkspace.shared.open(Store.root)

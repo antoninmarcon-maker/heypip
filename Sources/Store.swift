@@ -71,7 +71,11 @@ enum Store {
     let slug = name.lowercased().folding(options: .diacriticInsensitive, locale: .current)
       .replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
       .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-    let dir = root.appendingPathComponent(f.string(from: Date()) + (slug.isEmpty ? "" : "_" + slug))
+    let base = f.string(from: Date()) + (slug.isEmpty ? "" : "_" + slug)
+    // two meetings started in the same minute with the same name get their own folders (never overwrite one)
+    var dir = root.appendingPathComponent(base)
+    var n = 2
+    while FileManager.default.fileExists(atPath: dir.path) { dir = root.appendingPathComponent("\(base)-\(n)"); n += 1 }
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
     let d = DateFormatter()
     d.dateStyle = .medium
@@ -83,6 +87,23 @@ enum Store {
     try? FileManager.default.removeItem(at: current)
     try FileManager.default.createSymbolicLink(at: current, withDestinationURL: dir)
     return dir
+  }
+
+  /// The last meetings, newest first (folder names start with the date and time).
+  static func recentMeetings(limit: Int = 8) -> [URL] {
+    let fm = FileManager.default
+    let dirs = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+    return dirs.filter { $0.lastPathComponent != "current" && fm.fileExists(atPath: $0.appendingPathComponent("transcript.md").path) }
+      .sorted { $0.lastPathComponent > $1.lastPathComponent }
+      .prefix(limit).map { $0 }
+  }
+
+  /// « Atelier Lune · 13 Oct 2026 at 09:31 », from the first line of the transcript.
+  static func meetingTitle(_ dir: URL) -> String {
+    let first = (try? String(contentsOf: dir.appendingPathComponent("transcript.md"), encoding: .utf8))?
+      .split(separator: "\n").first.map(String.init) ?? ""
+    let title = first.hasPrefix("# ") ? String(first.dropFirst(2)) : first
+    return title.isEmpty ? dir.lastPathComponent : title
   }
 
   static func append(_ text: String, to url: URL) {
