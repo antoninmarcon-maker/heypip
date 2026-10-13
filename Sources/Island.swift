@@ -532,7 +532,7 @@ struct IslandView: View {
     VStack(alignment: .leading, spacing: 10) {
       Pip(mood: pipMood, size: 64).frame(maxWidth: .infinity, alignment: .leading)
       VStack(alignment: .leading, spacing: 1) {
-        Text(meeting.name.isEmpty ? L10n.t("meeting") : meeting.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+        meetingSwitcher
         Text(meeting.status).font(.system(size: 11.5)).foregroundStyle(.gray).lineLimit(2)
       }
       VStack(alignment: .leading, spacing: 7) {
@@ -564,6 +564,31 @@ struct IslandView: View {
     .frame(width: 150, alignment: .leading)
     .padding(.leading, 6)
     .padding(.vertical, 4)
+  }
+
+  /// The meeting's name; between meetings, a menu to start a new one or look back at a recent one.
+  @ViewBuilder private var meetingSwitcher: some View {
+    let title = !meeting.name.isEmpty ? meeting.name
+      : (!meeting.running ? meeting.dir.map(Store.meetingLabel) : nil) ?? L10n.t("meeting")
+    let label = Text(title).font(.system(size: 15, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
+    if meeting.running {
+      label
+    } else {
+      Menu {
+        Button(L10n.t("newMeeting")) { meeting.newMeetingView() }
+        Divider()
+        ForEach(Store.recentMeetings(), id: \.self) { dir in
+          Button((dir == meeting.dir ? "✓ " : "") + Store.meetingLabel(dir)) { meeting.show(dir) }
+        }
+      } label: {
+        HStack(spacing: 4) {
+          label
+          Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(.gray)
+        }
+      }
+      .menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
+      .help(L10n.t("recent"))
+    }
   }
 
   private func check(_ label: String, on: Bool, waiting: Bool) -> some View {
@@ -712,7 +737,7 @@ struct IslandView: View {
     Button(L10n.t("vocabulary")) { NSWorkspace.shared.open(Store.vocabularyFile) }
     Menu(L10n.t("recent")) {
       ForEach(Store.recentMeetings(), id: \.self) { dir in
-        Button((dir == meeting.dir ? "✓ " : "") + Store.meetingTitle(dir)) { meeting.show(dir) }.disabled(meeting.running)
+        Button((dir == meeting.dir ? "✓ " : "") + Store.meetingLabel(dir)) { meeting.show(dir) }.disabled(meeting.running)
       }
     }
     Button(L10n.t("meetings")) {

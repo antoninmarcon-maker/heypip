@@ -320,6 +320,19 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     }
   }
 
+  /// Clears the island for a new meeting (« Start » then creates it).
+  func newMeetingView() {
+    guard !running else { return }
+    feed = []
+    notes = []
+    dir = nil
+    name = ""
+    volatile = [:]
+    peek = nil
+    endedAt = nil
+    status = L10n.t("ready")
+  }
+
   /// Shows a past meeting in the island (its transcript and notes). « Start » still begins a new one.
   func show(_ meetingDir: URL) {
     guard !running else { return }

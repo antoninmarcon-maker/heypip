@@ -73,7 +73,11 @@ final class EchoText {
       guard !echo[i] else { i += 1; continue }
       var j = i
       while j + 1 < tokens.count, !echo[j + 1] { j += 1 }
-      runs.append(String(text[tokens[i].range.lowerBound..<tokens[j].range.upperBound]))
+      // a run of 1–2 words that are their words, misheard (« l'itération » for « l'ablitération »), goes too
+      let run = tokens[i...j].map(\.word)
+      if run.count > 2 || !run.allSatisfy({ w in all.contains { Self.similar(w, $0) } }) {
+        runs.append(String(text[tokens[i].range.lowerBound..<tokens[j].range.upperBound]))
+      }
       i = j + 1
     }
     let kept = runs.joined(separator: " … ")
@@ -81,9 +85,28 @@ final class EchoText {
     let left = Self.words(kept)
     let theirs = left.filter(all.contains).count
     if left.isEmpty || (left.count <= 2 ? theirs == left.count : Double(theirs) / Double(left.count) >= 0.7) { return nil }
-    // one or two stray words left in the middle of their sentence (a word misheard) are not you either
-    if left.count <= 2, Double(echo.filter { $0 }.count) / Double(mine.count) >= 0.6 { return nil }
     return kept.prefix(1).uppercased() + kept.dropFirst()
+  }
+
+  /// The same word, or a long word misheard (« habitation » / « habitération »); short words must match exactly,
+  /// so your « test » is never taken for their « est ».
+  static func similar(_ a: String, _ b: String) -> Bool {
+    if a == b { return true }
+    guard a.count >= 5, b.count >= 5, abs(a.count - b.count) <= 3 else { return false }
+    return distance(Array(a), Array(b)) <= a.count / 3
+  }
+
+  static func distance(_ a: [Character], _ b: [Character]) -> Int {
+    var row = Array(0...b.count)
+    for i in 1...a.count {
+      var prev = row[0]; row[0] = i
+      for j in 1...b.count {
+        let cur = row[j]
+        row[j] = min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] == b[j - 1] ? 0 : 1))
+        prev = cur
+      }
+    }
+    return row[b.count]
   }
 
   /// Is this « You » text only « Them »'s echo?

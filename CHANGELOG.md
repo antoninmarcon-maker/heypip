@@ -17,5 +17,8 @@ First public version.
 - Asks for the microphone before the first recording, and restarts the capture by itself if one side stops sending
   audio (microphone changed, AirPods switching to call mode); a recording keeps one format when the microphone changes.
 - The `/pip` command for Claude Code: follows the call, whispers notes, writes the summary.
+- Without headphones, the call's echo is removed from You (word by word: what you say over the call is kept).
+- Recent meetings: click the meeting's name in the island to look back at one or start a new one; a meeting never
+  overwrites another one.
 
-Known limitation: without headphones the microphone also hears the call, so You and Them mix. Use headphones.
+Best with headphones: without them your voice mixed with the speakers is recognised a little less well.

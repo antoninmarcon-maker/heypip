@@ -106,6 +106,19 @@ enum Store {
     return title.isEmpty ? dir.lastPathComponent : title
   }
 
+  /// « 13/10 09:31 · Atelier Lune » (just the date when the meeting has no name), for the meeting switcher.
+  static func meetingLabel(_ dir: URL) -> String {
+    let parts = dir.lastPathComponent.split(separator: "_", maxSplits: 2)  // 2026-10-13 · 0931 · atelier-lune
+    var when = ""
+    if parts.count >= 2 {
+      let day = parts[0].split(separator: "-"), hm = parts[1].prefix(4)
+      if day.count == 3, hm.count == 4 { when = "\(day[2])/\(day[1]) \(hm.prefix(2)):\(hm.suffix(2))" }
+    }
+    let name = meetingTitle(dir).components(separatedBy: " · ").first ?? ""
+    let generic = name.isEmpty || ["Meeting", "Réunion"].contains(name)
+    return [when, generic ? "" : name].filter { !$0.isEmpty }.joined(separator: " · ")
+  }
+
   static func append(_ text: String, to url: URL) {
     guard let data = text.data(using: .utf8), let h = try? FileHandle(forWritingTo: url) else { return }
     h.seekToEndOfFile()

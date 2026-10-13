@@ -83,7 +83,8 @@ Requirements: macOS 15 or later, Apple silicon or Intel. On macOS 26 Pip uses Ap
 on macOS 15 the previous speech recognizer. The speech model for your language downloads once. On macOS 15,
 on-device transcription is not guaranteed (see Privacy).
 
-**Use headphones.** Without them your microphone also hears the others, and « You » mixes with « Them ».
+**Best with headphones.** Without them your microphone also hears the call. Pip removes that echo from « You », but your
+voice mixed with the speakers is recognised a little less well.
 
 > Recording or transcribing a call usually requires the consent of everyone in it. Tell people at the start: Pip reminds you.
 
@@ -94,6 +95,7 @@ on-device transcription is not guaranteed (see Privacy).
 | Open Pip | move your pointer onto Pip, left of the notch; click to keep it open, click outside to close |
 | Start, pause, stop | the buttons under Pip, or the menu |
 | Turn the agent on or off | **✦ Claude** at the top of Pip |
+| Look back at a recent meeting, start a new one | click the meeting's name, top left of the island |
 | Language, vocabulary, folder, quit | the gear, or right-click Pip |
 | Hide the little Pip next to the notch | right-click Pip → **Pip next to the notch** |
 | Put Pip in the menu bar | gear → **Pip in the menu bar**: Pip leaves the notch, click its icon to open it |

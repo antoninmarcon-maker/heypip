@@ -89,7 +89,8 @@ Configuration : macOS 15 ou plus récent, Apple silicon ou Intel. Sur macOS 26, 
 d'Apple (plus rapide, plus précis) ; sur macOS 15, l'ancienne reconnaissance vocale. Le modèle de ta langue se
 télécharge une seule fois. Sur macOS 15, la transcription sur le Mac n'est pas garantie (voir Vie privée).
 
-**Mets un casque ou des écouteurs.** Sans, ton micro entend aussi les autres, et « Toi » se mélange avec « Eux ».
+**Le mieux : un casque ou des écouteurs.** Sans, ton micro entend aussi l'appel. Pip retire cet écho de « Toi », mais ta
+voix mélangée au haut-parleur est un peu moins bien reconnue.
 
 > Enregistrer ou transcrire un appel demande en général l'accord de tous les participants. Préviens-les au début :
 > Pip te le rappelle.
@@ -101,6 +102,7 @@ télécharge une seule fois. Sur macOS 15, la transcription sur le Mac n'est pas
 | Ouvrir Pip | passe ton pointeur sur Pip, à gauche de l'encoche ; clique pour le garder ouvert, clique à côté pour le fermer |
 | Démarrer, mettre en pause, arrêter | les boutons sous Pip, ou le menu |
 | Activer ou couper l'agent | **✦ Claude** en haut de Pip |
+| Revoir une réunion récente, en commencer une nouvelle | clic sur le nom de la réunion, en haut à gauche de l'île |
 | Langue, vocabulaire, dossier, quitter | la roue dentée, ou clic droit sur Pip |
 | Masquer le petit Pip à côté de l'encoche | clic droit sur Pip → **Pip à côté de l'encoche** |
 | Mettre Pip dans la barre de menus | roue dentée → **Pip dans la barre de menus** : Pip quitte l'encoche, un clic sur son icône l'ouvre |
