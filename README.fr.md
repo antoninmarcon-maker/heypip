@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/macOS-15%2B-black?logo=apple" alt="macOS 15+">
   <img src="https://img.shields.io/badge/transcription-sur%20ton%20Mac-0A84FF" alt="Sur ton Mac">
   <img src="https://img.shields.io/badge/licence-MIT-green" alt="MIT">
+  <a href="../../stargazers"><img src="https://img.shields.io/github/stars/pjksens/heypip?style=flat&color=FFD60A&label=%E2%98%85%20%C3%A9toiles" alt="Étoiles"></a>
 </p>
 
 <p align="center">
@@ -18,6 +19,10 @@
   <a href="https://sachapraljak.com/?utm_source=github&utm_medium=readme-fr&utm_campaign=heypip">sachapraljak.com</a> ·
   <a href="https://www.instagram.com/sachaprljk/">Instagram</a> ·
   <a href="https://www.tiktok.com/@sachaprljk">TikTok</a>
+</p>
+
+<p align="center">
+  <b>Pip te sert ? Une ⭐ aide d’autres personnes à le trouver.</b>
 </p>
 
 **Pip vit dans l'encoche de ton MacBook et fait entrer ton agent IA dans tes réunions.** Pendant une visio, un

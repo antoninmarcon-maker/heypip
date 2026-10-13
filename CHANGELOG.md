@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- A small star in the island, next to the settings: it opens Pip's GitHub page, then turns yellow once clicked.
+
 ## 0.1.0
 
 First public version.

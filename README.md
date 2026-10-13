@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/macOS-15%2B-black?logo=apple" alt="macOS 15+">
   <img src="https://img.shields.io/badge/transcription-on%20your%20Mac-0A84FF" alt="On device">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
+  <a href="../../stargazers"><img src="https://img.shields.io/github/stars/pjksens/heypip?style=flat&color=FFD60A&label=%E2%98%85%20stars" alt="Stars"></a>
 </p>
 
 <p align="center">
@@ -18,6 +19,10 @@
   <a href="https://sachapraljak.com/?utm_source=github&utm_medium=readme&utm_campaign=heypip">sachapraljak.com</a> ·
   <a href="https://www.instagram.com/sachaprljk/">Instagram</a> ·
   <a href="https://www.tiktok.com/@sachaprljk">TikTok</a>
+</p>
+
+<p align="center">
+  <b>If Pip helps you, a ⭐ helps other people find it.</b>
 </p>
 
 **Pip lives in your MacBook's notch and brings your AI agent into your meetings.** During a video call, a client

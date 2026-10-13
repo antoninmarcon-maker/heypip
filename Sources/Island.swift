@@ -501,6 +501,7 @@ struct IslandView: View {
       if let dir = meeting.dir {
         iconButton("folder") { NSWorkspace.shared.open(dir) }
       }
+      starButton
       Menu { menu } label: {
         Image(systemName: "gearshape").font(.system(size: 15)).foregroundStyle(.gray).frame(width: 34, height: 28)
       }
@@ -508,6 +509,23 @@ struct IslandView: View {
     }
     .padding(.horizontal, 14)
     .frame(height: state.band)
+  }
+
+  /// A small star that opens Pip's GitHub page (starring needs the user's own GitHub account, so the click on
+  /// « Star » stays theirs). Filled and yellow once clicked, so it stops asking.
+  @AppStorage("starClicked") private var starClicked = false
+
+  private var starButton: some View {
+    Button {
+      starClicked = true
+      NSWorkspace.shared.open(URL(string: "https://github.com/pjksens/heypip")!)
+    } label: {
+      Image(systemName: starClicked ? "star.fill" : "star").font(.system(size: 14, weight: .medium))
+        .foregroundStyle(starClicked ? Color(red: 1, green: 0.84, blue: 0.04) : .gray)
+        .frame(width: 30, height: 26)
+    }
+    .buttonStyle(.plain)
+    .help(L10n.t("star"))
   }
 
   private func tabButton(_ tab: IslandTab, _ symbol: String) -> some View {
