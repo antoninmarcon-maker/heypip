@@ -60,7 +60,7 @@ The whole call, the timings and the summary Claude wrote at the end: [docs/examp
 
 ## What Pip does
 
-- **Live, on your Mac.** Apple's speech recognition, sentence by sentence, 1–3 s after it is said. No audio leaves your Mac.
+- **Live, on your Mac.** Apple's speech recognition, sentence by sentence, 1–3 s after it is said. On macOS 26 no audio leaves your Mac (macOS 15: see Privacy).
 - **You and Them, separately.** Your microphone is « You », the call's audio is « Them », each on its own track.
 - **Your agent, or not.** One switch turns the agent off: Pip keeps transcribing, and nothing is written for the agent.
 - **Pause** when the call goes off the record: nothing is heard or saved until you resume.
@@ -80,7 +80,8 @@ The whole call, the timings and the summary Claude wrote at the end: [docs/examp
    If it asks you to quit and reopen Pip, do it, then press Start again.
 
 Requirements: macOS 15 or later, Apple silicon or Intel. On macOS 26 Pip uses Apple's new SpeechAnalyzer (faster, better);
-on macOS 15 the previous speech recognizer. The speech model for your language downloads once.
+on macOS 15 the previous speech recognizer. The speech model for your language downloads once. On macOS 15,
+on-device transcription is not guaranteed (see Privacy).
 
 **Use headphones.** Without them your microphone also hears the others, and « You » mixes with « Them ».
 
@@ -147,7 +148,10 @@ Without the command, tell Claude who you are meeting and what you want out of it
 
 ## Privacy
 
-- Transcription runs on your Mac. Pip has no account, no server, no analytics, and sends nothing anywhere.
+- On macOS 26, transcription runs on your Mac (Apple's SpeechAnalyzer).
+- On macOS 15, Pip asks for on-device transcription first. If your language's model isn't available on the Mac,
+  Apple's speech recognition uses Apple's servers, so on-device transcription is not guaranteed there.
+- Pip itself has no account, no server, no analytics, and sends nothing anywhere.
 - Your agent only sees `agent-feed.md`, and only while it is on. If your agent runs in the cloud, what it reads goes to its provider.
 - Audio and transcripts stay in your meetings folder until you delete them.
 

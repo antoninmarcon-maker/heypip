@@ -64,7 +64,7 @@ L'appel en entier, les délais et le résumé écrit par Claude à la fin :
 ## Ce que fait Pip
 
 - **En direct, sur ton Mac.** La reconnaissance vocale d'Apple, phrase par phrase, 1 à 3 s après qu'elle est dite.
-  Aucun son ne quitte ton Mac.
+  Sur macOS 26, aucun son ne quitte ton Mac (macOS 15 : voir Vie privée).
 - **Toi et Eux, séparément.** Ton micro, c'est « Toi » ; le son de l'appel, c'est « Eux », chacun sur sa piste.
 - **Ton agent, ou pas.** Un bouton coupe l'agent : Pip continue de transcrire, et rien n'est écrit pour l'agent.
 - **Pause** quand l'appel passe en off : rien n'est entendu ni enregistré jusqu'à la reprise.
@@ -87,7 +87,7 @@ L'appel en entier, les délais et le résumé écrit par Claude à la fin :
 
 Configuration : macOS 15 ou plus récent, Apple silicon ou Intel. Sur macOS 26, Pip utilise le nouveau SpeechAnalyzer
 d'Apple (plus rapide, plus précis) ; sur macOS 15, l'ancienne reconnaissance vocale. Le modèle de ta langue se
-télécharge une seule fois.
+télécharge une seule fois. Sur macOS 15, la transcription sur le Mac n'est pas garantie (voir Vie privée).
 
 **Mets un casque ou des écouteurs.** Sans, ton micro entend aussi les autres, et « Toi » se mélange avec « Eux ».
 
@@ -155,7 +155,10 @@ Sans la commande, dis à Claude qui tu rencontres et ce que tu veux obtenir, pui
 
 ## Vie privée
 
-- La transcription se fait sur ton Mac. Pip n'a ni compte, ni serveur, ni statistiques, et n'envoie rien nulle part.
+- Sur macOS 26, la transcription se fait sur ton Mac (SpeechAnalyzer d'Apple).
+- Sur macOS 15, Pip demande la transcription sur le Mac en priorité. Si le modèle de ta langue n'y est pas disponible,
+  la reconnaissance vocale d'Apple passe par ses serveurs : la transcription sur le Mac n'y est donc pas garantie.
+- Pip lui-même n'a ni compte, ni serveur, ni statistiques, et n'envoie rien nulle part.
 - Ton agent ne voit que `agent-feed.md`, et seulement quand il est activé. Si ton agent tourne dans le cloud, ce qu'il
   lit part chez son fournisseur.
 - Le son et les transcriptions restent dans ton dossier de réunions jusqu'à ce que tu les supprimes.
