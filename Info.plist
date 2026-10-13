@@ -14,8 +14,8 @@
   <key>CFBundleLocalizations</key><array><string>en</string><string>fr</string></array>
   <key>LSMinimumSystemVersion</key><string>15.0</string>
   <key>LSUIElement</key><true/>
-  <key>NSMicrophoneUsageDescription</key><string>Pip listens to your microphone to transcribe what you say during the call. Everything stays on your Mac.</string>
-  <key>NSSpeechRecognitionUsageDescription</key><string>Pip transcribes the call live, on your Mac.</string>
-  <key>NSAudioCaptureUsageDescription</key><string>Pip listens to the call's audio to transcribe the other participants. Everything stays on your Mac.</string>
+  <key>NSMicrophoneUsageDescription</key><string>Pip listens to your microphone to transcribe what you say during the call. Transcription runs on your Mac when available; recordings are saved only on your Mac.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>Pip transcribes the call live, on your Mac when available.</string>
+  <key>NSAudioCaptureUsageDescription</key><string>Pip listens to the call's audio to transcribe the other participants. Transcription runs on your Mac when available; recordings are saved only on your Mac.</string>
 </dict>
 </plist>
