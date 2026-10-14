@@ -28,6 +28,7 @@ bash build.sh                                                    # must finish w
 ./Pip.app/Contents/MacOS/Pip --test some.m4a en-US --realtime    # transcription as if live: sentences 1–3 s after speech
 ./Pip.app/Contents/MacOS/Pip --pin                               # island open, for screenshots
 ./Pip.app/Contents/MacOS/Pip --peek "A note"                     # a note popping out
+./Pip.app/Contents/MacOS/Pip -meetingsFolder /tmp/pip-test --start   # a meeting at launch, in a test folder
 ```
 
 There is no unit test target yet. Before a change is done: build clean, run `--test` on a real recording, look at the island

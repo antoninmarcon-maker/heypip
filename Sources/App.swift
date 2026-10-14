@@ -22,6 +22,10 @@ import Speech
       let lang = i + 1 < CommandLine.arguments.count ? CommandLine.arguments[i + 1] : "en"
       island.runDemo(french: lang == "fr")
     }
+    // --start: start a meeting at launch (tests; use -meetingsFolder <dir> to keep your meetings apart)
+    if CommandLine.arguments.contains("--start") {
+      Task { await meeting.start() }
+    }
     // --peek "text": show a sample note (screenshots)
     if let i = CommandLine.arguments.firstIndex(of: "--peek"), i + 1 < CommandLine.arguments.count {
       meeting.peek = CommandLine.arguments[i + 1]
