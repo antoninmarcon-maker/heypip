@@ -454,7 +454,7 @@ struct IslandView: View {
       HStack(spacing: 10) {
         Pip(mood: .whisper, size: 40)
         VStack(alignment: .leading, spacing: 2) {
-          Text(state.agentName).font(.system(size: 11, weight: .semibold)).foregroundStyle(accent)
+          Text(meeting.peekFromPip ? "Pip" : state.agentName).font(.system(size: 11, weight: .semibold)).foregroundStyle(accent)
           Text(meeting.peek ?? "").font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(2)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -556,8 +556,17 @@ struct IslandView: View {
       VStack(alignment: .leading, spacing: 7) {
         check(L10n.t("you"), on: meeting.hears[.me] == true, waiting: meeting.running)
         check(L10n.t("them"), on: meeting.hears[.them] == true, waiting: meeting.running)
-        if meeting.agentEnabled {
-          check(state.agentName, on: !meeting.notes.isEmpty, waiting: meeting.running)
+        if meeting.agentEnabled, meeting.running, meeting.agentReading == false {
+          HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 12)).foregroundStyle(.orange).frame(width: 16)
+            VStack(alignment: .leading, spacing: 1) {
+              Text(state.agentName).font(.system(size: 13)).foregroundStyle(.gray)
+              Text(L10n.t("noAgentShort")).font(.system(size: 10.5)).foregroundStyle(.orange).lineLimit(2)
+            }
+          }
+          .help(L10n.t("noAgent"))
+        } else if meeting.agentEnabled {
+          check(state.agentName, on: !meeting.notes.isEmpty || meeting.agentReading == true, waiting: meeting.running)
         } else {
           HStack(spacing: 8) {
             Image(systemName: "moon.zzz").font(.system(size: 12)).foregroundStyle(.gray).frame(width: 16)

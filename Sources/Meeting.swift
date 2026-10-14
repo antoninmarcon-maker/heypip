@@ -89,6 +89,12 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
   @Published var notes: [String] = []
   /// A new note arrived: the island shows it briefly.
   @Published var peek: String?
+  /// The peek is Pip's own message (no agent reading), not an agent note.
+  @Published var peekFromPip = false
+  /// Agent switch on during a meeting: is an agent following agent-feed.md? nil when unknown.
+  @Published var agentReading: Bool?
+  private var agentWarned = false
+  private var agentCheckedAt: Date?
   @Published var startedAt: Date?
   /// Recording paused: audio is dropped (not transcribed, not saved) until resume.
   @Published var paused = false
@@ -171,6 +177,9 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       echo.reset()
       pendingMe = []
       pendingThem = []
+      agentReading = nil
+      agentWarned = false
+      agentCheckedAt = nil
       micEchoAt = nil
       volatile = [:]
       notes = []
@@ -220,6 +229,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
           let now: [Speaker: Bool] = [.me: me, .them: self.levels.recent(.them)]
           if now != self.hears { self.hears = now }
           self.watchCapture()
+          self.checkAgent()
         }
       }
     } catch {
@@ -394,7 +404,30 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     if let dir, running {
       Store.append("\n— \(L10n.t(agentEnabled ? "agentOn" : "agentOff")) (\(timeFormat.string(from: Date()))) —\n", to: dir.appendingPathComponent("agent-feed.md"))
     }
-    if !agentEnabled { peek = nil }
+    if !agentEnabled { peek = nil; agentReading = nil }
+  }
+
+  /// Every few seconds: is an agent following the feed? A note in this meeting, or another process with
+  /// agent-feed.md open (`tail -F`, as the /pip skill does). After 20 s without one, Pip says so once.
+  private func checkAgent() {
+    guard running, agentEnabled, let dir else { return }
+    if !notes.isEmpty { agentReading = true; return }
+    let now = Date()
+    if let at = agentCheckedAt, now.timeIntervalSince(at) < 3 { return }
+    agentCheckedAt = now
+    let path = FeedReaders.realPath(dir.appendingPathComponent("agent-feed.md").path)
+    Task.detached(priority: .utility) {
+      let reading = FeedReaders.any(path)
+      await MainActor.run { [weak self] in
+        guard let self, self.running, self.agentEnabled else { return }
+        self.agentReading = reading || !self.notes.isEmpty
+        if self.agentReading == false, !self.agentWarned, !self.paused,
+           let start = self.startedAt, Date().timeIntervalSince(start) > 20 {
+          self.agentWarned = true
+          self.showPeek(L10n.t("noAgent"), fromPip: true)
+        }
+      }
+    }
   }
 
   private func watchNotes() {
@@ -422,8 +455,9 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     if changed, agentEnabled, let latest { showPeek(latest) }
   }
 
-  private func showPeek(_ text: String) {
+  private func showPeek(_ text: String, fromPip: Bool = false) {
     peekTask?.cancel()
+    peekFromPip = fromPip
     peek = text
     NSSound(named: "Tink")?.play()
     peekTask = Task { [weak self] in
@@ -431,5 +465,37 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       guard !Task.isCancelled else { return }
       self?.peek = nil
     }
+  }
+}
+
+/// Is another process reading a file (an agent's `tail -F agent-feed.md`)? Looks at open files of the user's processes.
+enum FeedReaders {
+  /// The path the system reports for open files (`resolvingSymlinksInPath` drops `/private`, this does not).
+  nonisolated static func realPath(_ path: String) -> String {
+    guard let p = realpath(path, nil) else { return path }
+    defer { free(p) }
+    return String(cString: p)
+  }
+
+  nonisolated static func any(_ path: String) -> Bool {
+    let me = getpid()
+    let n = proc_listallpids(nil, 0)
+    guard n > 0 else { return false }
+    var pids = [pid_t](repeating: 0, count: Int(n) + 32)
+    let count = proc_listallpids(&pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+    for pid in pids.prefix(Int(max(count, 0))) where pid > 0 && pid != me {
+      let size = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
+      guard size > 0 else { continue }
+      var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: Int(size) / MemoryLayout<proc_fdinfo>.size)
+      let got = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, size)
+      for fd in fds.prefix(Int(max(got, 0)) / MemoryLayout<proc_fdinfo>.size) where fd.proc_fdtype == PROX_FDTYPE_VNODE {
+        var info = vnode_fdinfowithpath()
+        let r = proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDVNODEPATHINFO, &info, Int32(MemoryLayout<vnode_fdinfowithpath>.size))
+        guard r == MemoryLayout<vnode_fdinfowithpath>.size else { continue }
+        let p = withUnsafeBytes(of: info.pvip.vip_path) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
+        if p == path { return true }
+      }
+    }
+    return false
   }
 }
