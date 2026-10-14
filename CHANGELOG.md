@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.2
+
+- Pip says when no agent is reading the feed: with the agent switch on and nobody following `agent-feed.md` after
+  20 seconds, a message in the notch (« No agent is reading · type /pip in Claude Code ») and a warning in the island.
+- `transcript.md` lines are written in time order (a « Them » line no longer lands before an older « You » line).
+- `/pip summary [folder]`: summarises a meeting recorded without an agent, from its `transcript.md`.
+- During the call, « Claude, … » asks the agent directly; the answer comes as the next note.
+- Update the `/pip` command to get the last two:
+  `curl -fsSL https://raw.githubusercontent.com/pjksens/heypip/main/integrations/claude-code/pip/SKILL.md -o ~/.claude/skills/pip/SKILL.md`
+
 ## 0.1.1
 
 - A small star in the island, next to the settings: it opens Pip's GitHub page, then turns yellow once clicked.
