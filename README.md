@@ -139,7 +139,13 @@ Your agent follows `agent-feed.md` and adds one short line per note to `notes.md
    ```
 
 3. Press **Start** in Pip, with **✦ Claude** on. Notes pop out of the notch; when you stop, the summary is in
-   `summary.md`.
+   `summary.md`. If no agent is reading the feed, Pip says so in the notch after 20 seconds.
+
+During the call you can ask Claude out loud: « Claude, what did they pay last time? ». The answer comes as the next
+note (the other side hears the question too).
+
+A meeting recorded without an agent can be summarised afterwards: `/pip summary` (the latest meeting) or
+`/pip summary ~/Documents/Pip/<folder>` writes `summary.md` in that folder.
 
 Without the command, tell Claude who you are meeting and what you want out of it, then paste:
 
