@@ -111,6 +111,8 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
   private let echo = EchoText()
   /// « You » sentences waiting EchoText.wait seconds before they are written (or dropped as an echo).
   private var pendingMe: [(time: Date, text: String)] = []
+  /// « Them » sentences held only while an older « You » sentence is still waiting, so lines are written in time order.
+  private var pendingThem: [(time: Date, text: String)] = []
   /// Last time the microphone was only hearing the call.
   private var micEchoAt: Date?
   private var levelsTimer: Timer?
@@ -168,6 +170,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       splitters = [.me: SentenceSplitter(), .them: SentenceSplitter()]
       echo.reset()
       pendingMe = []
+      pendingThem = []
       micEchoAt = nil
       volatile = [:]
       notes = []
@@ -210,7 +213,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       levelsTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
         Task { @MainActor in
           guard let self else { return }
-          self.flushMe()
+          self.flush()
           let micEcho = self.levels.micIsEcho()
           if micEcho { self.micEchoAt = Date() }
           let me = self.levels.recent(.me) && !micEcho
@@ -237,7 +240,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     for t in transcribers.values { await t.stop() }
     transcribers = [:]
     try? await Task.sleep(for: .milliseconds(300))  // last results still on their way to handle()
-    flushMe(force: true)
+    flush(force: true)
     if let dir {
       let f = DateFormatter()
       f.dateFormat = "HH:mm"
@@ -301,21 +304,32 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
   }
 
   /// « Them » is written at once; « You » waits a moment, so an echo of « Them » can be recognised and dropped.
+  /// A « Them » sentence that comes after a « You » sentence still waiting is held until that one is written.
   private func route(_ who: Speaker, _ sentence: String) {
     if who == .them {
       echo.them(sentence)
-      write(.them, sentence)
+      pendingThem.append((Date(), sentence))
+      flush()
     } else {
       pendingMe.append((Date(), sentence))
     }
   }
 
-  private func flushMe(force: Bool = false) {
+  /// Writes waiting sentences of both sides in time order.
+  private func flush(force: Bool = false) {
     let now = Date()
-    while let first = pendingMe.first, force || now.timeIntervalSince(first.time) >= EchoText.wait {
-      pendingMe.removeFirst()
-      if let mine = echo.filter(first.text, at: first.time, micEcho: micEchoAt.map { first.time.timeIntervalSince($0) < 5 } ?? false) {
-        write(.me, mine, at: first.time)
+    while true {
+      let me = pendingMe.first
+      if let them = pendingThem.first, me.map({ them.time <= $0.time }) ?? true {
+        pendingThem.removeFirst()
+        write(.them, them.text, at: them.time)
+      } else if let me, force || now.timeIntervalSince(me.time) >= EchoText.wait {
+        pendingMe.removeFirst()
+        if let mine = echo.filter(me.text, at: me.time, micEcho: micEchoAt.map { me.time.timeIntervalSince($0) < 5 } ?? false) {
+          write(.me, mine, at: me.time)
+        }
+      } else {
+        break
       }
     }
   }
