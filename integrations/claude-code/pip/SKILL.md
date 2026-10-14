@@ -27,9 +27,10 @@ If it starts with `summary`, do not follow a call: see « Summary of a past meet
 1. Watch the feed with the Monitor tool: `tail -n 0 -F ~/Documents/Pip/current/agent-feed.md`.
    It works even if the call has not started yet. Tell the user in one line that you are ready, then stay quiet.
 2. A `You:` line (French: `Toi:`) that starts with « Claude » (« Claude, what did they pay last time? ») is the user
-   asking you directly: answer it in the next note, even if it is not a moment you would have spoken, checking the web
-   if needed. The transcription may write the name a little differently (« Claud », « Clode »): a line that starts
-   with a word close to « Claude » counts. Any other line is the call, not a request.
+   asking you directly. Answer at once by adding the answer as a line to `~/Documents/Pip/current/notes.md` (step 3),
+   checking the web if needed. Never answer in the terminal: during the call the user only sees the notch.
+   The transcription may write the name a little differently (« Claud », « Clode »): a line that starts with a word
+   close to « Claude » counts. Any other line is the call, not a request.
 3. On each new line, think about the user's goal. Only when it really helps, add ONE line at the end of
    `~/Documents/Pip/current/notes.md`: the next question to ask, the option to pick and why, an unclear point,
    a number that does not add up, a fact you checked. 90 characters max, in the language of the call.
