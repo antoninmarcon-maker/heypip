@@ -95,6 +95,8 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
   @Published var agentReading: Bool?
   private var agentWarned = false
   private var agentCheckedAt: Date?
+  /// When the agent switch was last turned on (or the meeting started with it on): the warning waits 20 s from there.
+  private var agentOnAt: Date?
   @Published var startedAt: Date?
   /// Recording paused: audio is dropped (not transcribed, not saved) until resume.
   @Published var paused = false
@@ -184,6 +186,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       agentReading = nil
       agentWarned = false
       agentCheckedAt = nil
+      agentOnAt = Date()
       micEchoAt = nil
       volatile = [:]
       notes = []
@@ -417,11 +420,16 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     if let dir, running {
       Store.append("\n— \(L10n.t(agentEnabled ? "agentOn" : "agentOff")) (\(timeFormat.string(from: Date()))) —\n", to: dir.appendingPathComponent("agent-feed.md"))
     }
-    if !agentEnabled { peek = nil; agentReading = nil }
+    if agentEnabled {
+      // switched on again: say it again if no agent reads within 20 s
+      agentOnAt = Date(); agentWarned = false; agentCheckedAt = nil
+    } else {
+      peek = nil; agentReading = nil
+    }
   }
 
   /// Every few seconds: is an agent following the feed? A note in this meeting, or another process with
-  /// agent-feed.md open (`tail -F`, as the /pip skill does). After 20 s without one, Pip says so once.
+  /// agent-feed.md open (`tail -F`, as the /pip skill does). After 20 s without one, Pip says so, once per switch-on.
   private func checkAgent() {
     guard running, agentEnabled, let dir else { return }
     if !notes.isEmpty { agentReading = true; return }
@@ -435,7 +443,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
         guard let self, self.running, self.agentEnabled else { return }
         self.agentReading = reading || !self.notes.isEmpty
         if self.agentReading == false, !self.agentWarned, !self.paused,
-           let start = self.startedAt, Date().timeIntervalSince(start) > 20 {
+           let on = self.agentOnAt, Date().timeIntervalSince(on) > 20 {
           self.agentWarned = true
           self.showPeek(L10n.t("noAgent"), fromPip: true)
         }
