@@ -442,6 +442,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       await MainActor.run { [weak self] in
         guard let self, self.running, self.agentEnabled else { return }
         self.agentReading = reading || !self.notes.isEmpty
+        Trace.log("AG reading \(self.agentReading == true ? 1 : 0)")
         if self.agentReading == false, !self.agentWarned, !self.paused,
            let on = self.agentOnAt, Date().timeIntervalSince(on) > 20 {
           self.agentWarned = true
@@ -480,6 +481,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     peekTask?.cancel()
     peekFromPip = fromPip
     peek = text
+    Trace.log("PEEK \(fromPip ? "pip" : "agent") \(text)")
     if !Replay.active { NSSound(named: "Tink")?.play() }
     peekTask = Task { [weak self] in
       try? await Task.sleep(for: .seconds(8))
