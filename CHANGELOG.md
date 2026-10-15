@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3
+
+- The call no longer leaks into « You »: a leak through headphones (or the echo from speakers) used to come out as
+  « You » lines, often as the first line of a meeting. The « You » transcription now only hears the microphone when it
+  is clearly louder than the call's echo, measured during the meeting; `you.m4a` still records everything.
+- The « No agent is reading » message shows again when the agent switch is turned back on during a meeting.
+- For contributors: `--replay you.m4a them.m4a` plays a recorded call through Pip silently (send both tracks with an
+  echo bug report), `PIP_TRACE` logs the decisions.
+
 ## 0.1.2
 
 - Pip says when no agent is reading the feed: with the agent switch on and nobody following `agent-feed.md` after
