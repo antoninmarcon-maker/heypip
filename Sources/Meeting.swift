@@ -109,12 +109,15 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
   /// The agent follows agent-feed.md and writes notes.md. Off: transcription only, nothing for the agent.
   @Published var agentEnabled = Store.agentEnabled
 
-  private let capture = Capture()
+  /// The live capture, or a recorded call played back (`--replay`).
+  var capture: AudioSource = Capture()
   private var transcribers: [Speaker: Transcribing] = [:]
   private var notesTimer: Timer?
   private let levels = Levels()
   private var splitters: [Speaker: SentenceSplitter] = [:]
   private let echo = EchoText()
+  /// Silences the call's echo in what the « You » transcriber hears (see Echo.swift).
+  private let gate = MicGate()
   /// « You » sentences waiting EchoText.wait seconds before they are written (or dropped as an echo).
   private var pendingMe: [(time: Date, text: String)] = []
   /// « Them » sentences held only while an older « You » sentence is still waiting, so lines are written in time order.
@@ -175,6 +178,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       hears = [:]
       splitters = [.me: SentenceSplitter(), .them: SentenceSplitter()]
       echo.reset()
+      gate.reset()
       pendingMe = []
       pendingThem = []
       agentReading = nil
@@ -195,14 +199,18 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       try await me.start(languageID: Store.languageID, words: words, onResult: handler)
       try await them.start(languageID: Store.languageID, words: words, onResult: handler)
       let levels = self.levels
+      let gate = self.gate
       let pauseFlag = self.pauseFlag
       capture.onAudio = { buf, who in
         levels.got(who)
         if pauseFlag.value { return }
         let loudness = rms(buf)
+        Trace.log("A \(who.rawValue) \(loudness)")
         levels.loud(who, loudness)
         if loudness > 0.01 { levels.heard(who) }
-        (who == .me ? me : them).feed(buf)
+        if who == .them { them.feed(buf) }
+        if !MicGate.enabled { if who == .me { me.feed(buf) }; return }
+        for b in who == .me ? gate.mic(buf) : gate.call(buf) { me.feed(b.original, heard: b.heard) }
       }
       capture.onError = { [weak self] msg in
         Task { @MainActor in
@@ -247,6 +255,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     defer { busy = false }
     status = L10n.t("stopping")
     await capture.stop()
+    if let me = transcribers[.me] { for b in gate.flush() { me.feed(b.original, heard: b.heard) } }
     for t in transcribers.values { await t.stop() }
     transcribers = [:]
     try? await Task.sleep(for: .milliseconds(300))  // last results still on their way to handle()
@@ -321,6 +330,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       pendingThem.append((Date(), sentence))
       flush()
     } else {
+      Trace.log("R me \(sentence)")
       pendingMe.append((Date(), sentence))
     }
   }
@@ -336,7 +346,10 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
       } else if let me, force || now.timeIntervalSince(me.time) >= EchoText.wait {
         pendingMe.removeFirst()
         if let mine = echo.filter(me.text, at: me.time, micEcho: micEchoAt.map { me.time.timeIntervalSince($0) < 5 } ?? false) {
+          Trace.log("W me \(mine)")
           write(.me, mine, at: me.time)
+        } else {
+          Trace.log("X text \(me.text)")
         }
       } else {
         break
@@ -459,7 +472,7 @@ func hasSound(_ buf: AVAudioPCMBuffer) -> Bool { rms(buf) > 0.01 }
     peekTask?.cancel()
     peekFromPip = fromPip
     peek = text
-    NSSound(named: "Tink")?.play()
+    if !Replay.active { NSSound(named: "Tink")?.play() }
     peekTask = Task { [weak self] in
       try? await Task.sleep(for: .seconds(8))
       guard !Task.isCancelled else { return }

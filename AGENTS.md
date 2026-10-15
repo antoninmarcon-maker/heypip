@@ -13,6 +13,8 @@ Swift 5 language mode, SwiftUI + AppKit, no dependencies, no Xcode project: `swi
 | `Sources/Meeting.swift` | a meeting: start/stop/pause, feed, notes, agent switch, sound levels |
 | `Sources/Audio.swift` | ScreenCaptureKit capture (mic = You, system audio = Them), transcribers (SpeechAnalyzer on macOS 26, SFSpeechRecognizer on 15), recorder |
 | `Sources/Sentences.swift` | turns the recogniser's running text into finished sentences (offset based) |
+| `Sources/Echo.swift` | keeps the call's echo out of « You »: `MicGate` (the You transcriber only hears the mic when it is louder than the call's echo), `EchoText` (drops You sentences that repeat Them), `micIsEcho` |
+| `Sources/Replay.swift` | `--replay`: a recorded call (you.m4a + them.m4a) through Pip, silently; `PIP_TRACE` debug log |
 | `Sources/Updater.swift` | updates from GitHub releases: checks `releases/latest`, downloads `Pip.zip`, verifies Team ID + signature + Gatekeeper, replaces the app between meetings |
 | `Sources/Store.swift` | settings (UserDefaults `com.sachapraljak.heypip`), meeting folders and files |
 | `Sources/L10n.swift` | every UI string, English + French. Add both when you add a string. |
@@ -29,7 +31,14 @@ bash build.sh                                                    # must finish w
 ./Pip.app/Contents/MacOS/Pip --pin                               # island open, for screenshots
 ./Pip.app/Contents/MacOS/Pip --peek "A note"                     # a note popping out
 ./Pip.app/Contents/MacOS/Pip -meetingsFolder /tmp/pip-test --start   # a meeting at launch, in a test folder
+./Pip.app/Contents/MacOS/Pip -meetingsFolder /tmp/pip-test --start --stop-after 40   # …ended properly after 40 s
+./Pip.app/Contents/MacOS/Pip -meetingsFolder /tmp/pip-test --replay you.m4a them.m4a   # a recorded call, silently
 ```
+
+Always pass `-meetingsFolder` with `--start` or `--replay`, so the test meeting does not land in `~/Documents/Pip`.
+For echo issues, replay the reporter's two tracks: `PIP_TRACE=trace.txt` logs every 20 ms decision of the gate
+(`G open mic echo gain floor`) and every « You » sentence (`R` recognised, `W` written, `X` dropped), and `PIP_GATE=0`
+turns the gate off to compare.
 
 There is no unit test target yet. Before a change is done: build clean, run `--test` on a real recording, look at the island
 (`--pin`, `--peek`) with `screencapture`, and test a real call when audio code changed.

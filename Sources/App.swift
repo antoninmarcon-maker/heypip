@@ -10,6 +10,27 @@ import Speech
   private var bag = Set<AnyCancellable>()
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    // --replay you.m4a them.m4a [seconds]: a recorded call through Pip, silently and without the island, then quits.
+    // Without seconds, the two tracks are lined up from their sound.
+    let args = CommandLine.arguments
+    if let i = args.firstIndex(of: "--replay"), i + 2 < args.count {
+      let delay = i + 3 < args.count ? Double(args[i + 3]) : nil
+      guard let replay = try? Replay(you: URL(fileURLWithPath: args[i + 1]), them: URL(fileURLWithPath: args[i + 2]), themDelay: delay) else {
+        print("cannot read the two tracks"); exit(1)
+      }
+      print(String(format: "« Them » moved by %+.2f s", replay.delay)); fflush(stdout)
+      meeting.capture = replay
+      let meeting = self.meeting
+      Task { @MainActor in
+        await meeting.start()
+        try? await Task.sleep(for: .seconds(replay.duration + 3))
+        await meeting.stop()
+        Trace.save()
+        print(meeting.dir?.path ?? "no meeting")
+        exit(0)
+      }
+      return
+    }
     let island = IslandController(meeting: meeting, updater: updater)
     self.island = island
     let meeting = self.meeting
@@ -25,6 +46,16 @@ import Speech
     // --start: start a meeting at launch (tests; use -meetingsFolder <dir> to keep your meetings apart)
     if CommandLine.arguments.contains("--start") {
       Task { await meeting.start() }
+    }
+    // --stop-after seconds: ends the meeting properly (audio files closed), then quits (tests)
+    if let i = CommandLine.arguments.firstIndex(of: "--stop-after"), i + 1 < CommandLine.arguments.count,
+       let s = Double(CommandLine.arguments[i + 1]) {
+      Task { @MainActor in
+        try? await Task.sleep(for: .seconds(s))
+        await meeting.stop()
+        Trace.save()
+        NSApp.terminate(nil)
+      }
     }
     // --peek "text": show a sample note (screenshots)
     if let i = CommandLine.arguments.firstIndex(of: "--peek"), i + 1 < CommandLine.arguments.count {

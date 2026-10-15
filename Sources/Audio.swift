@@ -24,8 +24,13 @@ func pcmBuffer(from sb: CMSampleBuffer) -> AVAudioPCMBuffer? {
 
 protocol Transcribing: AnyObject, Sendable {
   func start(languageID: String, words: [String], onResult: @escaping @Sendable (Speaker, String, Bool) -> Void) async throws
-  func feed(_ buf: AVAudioPCMBuffer)
+  /// Records `buf`; the transcriber hears `heard` (the gated microphone) when given, else `buf`.
+  func feed(_ buf: AVAudioPCMBuffer, heard: AVAudioPCMBuffer?)
   func stop() async
+}
+
+extension Transcribing {
+  func feed(_ buf: AVAudioPCMBuffer) { feed(buf, heard: nil) }
 }
 
 /// SpeechAnalyzer on macOS 26 (better, faster), SFSpeechRecognizer before.
@@ -123,14 +128,15 @@ final class LiveTranscriber: Transcribing, @unchecked Sendable {
   }
 
   /// Called from ScreenCaptureKit's audio queue.
-  func feed(_ buf: AVAudioPCMBuffer) {
+  func feed(_ buf: AVAudioPCMBuffer, heard: AVAudioPCMBuffer?) {
     lock.lock(); defer { lock.unlock() }
     recorder.write(buf)
+    let heard = heard ?? buf
     guard let target = format, let input else { return }
-    if converter == nil || converter?.inputFormat != buf.format {
-      converter = AVAudioConverter(from: buf.format, to: target)
+    if converter == nil || converter?.inputFormat != heard.format {
+      converter = AVAudioConverter(from: heard.format, to: target)
     }
-    if let out = convert(buf, with: converter, to: target) { input.yield(AnalyzerInput(buffer: out)) }
+    if let out = convert(heard, with: converter, to: target) { input.yield(AnalyzerInput(buffer: out)) }
   }
 
   private func closeInput() {
@@ -212,10 +218,10 @@ final class LegacyTranscriber: Transcribing, @unchecked Sendable {
     }
   }
 
-  func feed(_ buf: AVAudioPCMBuffer) {
+  func feed(_ buf: AVAudioPCMBuffer, heard: AVAudioPCMBuffer?) {
     lock.lock(); defer { lock.unlock() }
     recorder.write(buf)
-    request?.append(buf)
+    request?.append(heard ?? buf)
   }
 
   func stop() async {
