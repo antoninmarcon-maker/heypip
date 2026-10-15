@@ -10,6 +10,16 @@ import Speech
   private var bag = Set<AnyCancellable>()
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    // --agent-switch 25,50: turns the agent switch over at those seconds (tests; an even count leaves it as it was)
+    if let i = CommandLine.arguments.firstIndex(of: "--agent-switch"), i + 1 < CommandLine.arguments.count {
+      for s in CommandLine.arguments[i + 1].split(separator: ",").compactMap({ Double($0) }) {
+        Task { @MainActor in
+          try? await Task.sleep(for: .seconds(s))
+          self.meeting.toggleAgent()
+          Trace.log("SWITCH agent \(self.meeting.agentEnabled ? "on" : "off")")
+        }
+      }
+    }
     // --replay you.m4a them.m4a [seconds]: a recorded call through Pip, silently and without the island, then quits.
     // Without seconds, the two tracks are lined up from their sound.
     let args = CommandLine.arguments
@@ -20,6 +30,7 @@ import Speech
       }
       print(String(format: "« Them » moved by %+.2f s", replay.delay)); fflush(stdout)
       meeting.capture = replay
+      if args.contains("--island") { island = IslandController(meeting: meeting, updater: updater) }
       let meeting = self.meeting
       Task { @MainActor in
         await meeting.start()
